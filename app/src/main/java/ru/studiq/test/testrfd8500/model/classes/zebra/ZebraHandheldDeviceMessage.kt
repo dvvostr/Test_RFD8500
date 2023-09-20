@@ -8,5 +8,5 @@ enum class ZebraHandheldDeviceMessageType(var value: Int) {
     error(3),
     exception(4)
 }
-class ZebraHandheldDeviceMessage(var type: ZebraHandheldDeviceMessageType, msg: String?, var data: Any? = null) {
+class ZebraHandheldDeviceMessage(var type: ZebraHandheldDeviceMessageType, var msg: String?, var data: Any? = null) {
 }

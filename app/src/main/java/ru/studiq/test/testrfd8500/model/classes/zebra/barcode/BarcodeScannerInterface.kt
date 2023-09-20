@@ -9,8 +9,9 @@ import ru.studiq.test.testrfd8500.model.interfaces.ICustomObjectEventListener
 import java.util.ArrayList
 import java.util.concurrent.Executors
 
-class BarcodeScannerInterface (val listener : IBarcodeScannedListener): IDcsSdkApiDelegate {
+class BarcodeScannerInterface (val context: Context?, var listener: IBarcodeScannedListener?): IDcsSdkApiDelegate {
     private var sdkHandler: SDKHandler? = null
+    private var scannerID: Int = -1
     private var scannerInfoList : ArrayList<DCSScannerInfo> = ArrayList()
 
     enum class LEDType(var value: Int) {
@@ -22,7 +23,7 @@ class BarcodeScannerInterface (val listener : IBarcodeScannedListener): IDcsSdkA
         otherOff(RMDAttributes.RMD_ATTR_VALUE_ACTION_LED_OTHER_OFF);
     }
 
-    fun getAvailableScanners(context : Context) : ArrayList<DCSScannerInfo> {
+    fun getAvailableScanners() : ArrayList<DCSScannerInfo> {
         if(sdkHandler == null)
             sdkHandler = SDKHandler(context)
 
@@ -49,9 +50,12 @@ class BarcodeScannerInterface (val listener : IBarcodeScannedListener): IDcsSdkA
     fun connectToScanner(scannerID : Int) : Boolean{
         try {
             val scanner = scannerInfoList.first { x -> x.scannerID == scannerID }
-            if(scanner.isActive)
-                return true
-            return sdkHandler!!.dcssdkEstablishCommunicationSession(scanner.scannerID) == DCSSDKDefs.DCSSDK_RESULT.DCSSDK_RESULT_SUCCESS
+            var  resilt = if  (scanner.isActive)
+                true
+            else
+                sdkHandler!!.dcssdkEstablishCommunicationSession(scanner.scannerID) == DCSSDKDefs.DCSSDK_RESULT.DCSSDK_RESULT_SUCCESS
+            this.scannerID = if (resilt) scanner.scannerID else -1
+            return resilt
         } catch (e: Exception) {
             return false
         }
@@ -61,6 +65,7 @@ class BarcodeScannerInterface (val listener : IBarcodeScannedListener): IDcsSdkA
             if (sdkHandler != null) {
                 sdkHandler = null
             }
+            this.scannerID = -1
         } catch (e: InvalidUsageException) {
             e.printStackTrace()
         } catch (e: OperationFailureException) {
@@ -69,23 +74,32 @@ class BarcodeScannerInterface (val listener : IBarcodeScannedListener): IDcsSdkA
             e.printStackTrace()
         }
     }
-    fun startScan(context: Context?, scannerID: Int): Boolean {
+    fun startScan(): Boolean {
         try {
-            setLED(context, scannerID, LEDType.redOn)
+            setLED(LEDType.redOn)
             var xml = "<inArgs><scannerID>${scannerID}</scannerID></inArgs>"
             val outXML = StringBuilder()
             return (sdkHandler?.dcssdkExecuteCommandOpCodeInXMLForScanner(DCSSDKDefs.DCSSDK_COMMAND_OPCODE.DCSSDK_DEVICE_PULL_TRIGGER, xml, outXML) == DCSSDKDefs.DCSSDK_RESULT.DCSSDK_RESULT_SUCCESS) ?: false
         } finally {
-            setLED(context, scannerID, LEDType.redOff)
+            setLED(LEDType.redOff)
         }
     }
-    fun stopScan(){
+    fun stopScan(): Boolean {
+        val scannerID = scannerID?.let { it } ?: this.scannerID
+        try {
+            setLED(LEDType.redOn)
+            var xml = "<inArgs><scannerID>${scannerID}</scannerID></inArgs>"
+            val outXML = StringBuilder()
+            return (sdkHandler?.dcssdkExecuteCommandOpCodeInXMLForScanner(DCSSDKDefs.DCSSDK_COMMAND_OPCODE.DCSSDK_DEVICE_RELEASE_TRIGGER, xml, outXML) == DCSSDKDefs.DCSSDK_RESULT.DCSSDK_RESULT_SUCCESS) ?: false
+        } finally {
+            setLED(LEDType.redOff)
+        }
         sdkHandler?.dcssdkStopScanningDevices()
     }
-    fun setLED(context: Context?, scannerID: Int, ledType: LEDType): Boolean {
+    fun setLED(ledType: LEDType): Boolean {
         val xml = "<inArgs><scannerID>${scannerID}</scannerID><cmdArgs><arg-int>${ledType.value}</arg-int></cmdArgs></inArgs>"
         val outXML = StringBuilder()
-        executeCommandAsync(context, DCSSDKDefs.DCSSDK_COMMAND_OPCODE.DCSSDK_SET_ACTION, xml, outXML)
+        executeCommandAsync(DCSSDKDefs.DCSSDK_COMMAND_OPCODE.DCSSDK_SET_ACTION, xml, outXML)
         return true
     }
     fun executeCommand(opCode: DCSSDKDefs.DCSSDK_COMMAND_OPCODE?, inXML: String?, outXML: StringBuilder?): Boolean {
@@ -96,7 +110,7 @@ class BarcodeScannerInterface (val listener : IBarcodeScannedListener): IDcsSdkA
         } ?: false
 
     }
-    fun executeCommandAsync(context: Context?, opCode: DCSSDKDefs.DCSSDK_COMMAND_OPCODE?, inXML: String?, outXML: StringBuilder?, listener: ICustomObjectEventListener? = null){
+    fun executeCommandAsync(opCode: DCSSDKDefs.DCSSDK_COMMAND_OPCODE?, inXML: String?, outXML: StringBuilder?, listener: ICustomObjectEventListener? = null){
         Executors.newSingleThreadExecutor().execute {
             val hnd = Handler(Looper.getMainLooper())
             if (executeCommand(opCode, inXML, outXML))
@@ -116,7 +130,7 @@ class BarcodeScannerInterface (val listener : IBarcodeScannedListener): IDcsSdkA
     }
     override fun dcssdkEventBarcode(barcodeData: ByteArray?, barcodeType: Int, scannerID: Int) {
         barcodeData?.let { barcode ->
-            listener.onBarcodeScan(String(barcode))
+            listener?.onBarcodeScan(String(barcode))
         }
     }
     override fun dcssdkEventImage(imageData: ByteArray?, scannerID: Int) {

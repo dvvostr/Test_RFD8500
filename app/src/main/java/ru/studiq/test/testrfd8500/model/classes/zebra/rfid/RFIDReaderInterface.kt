@@ -5,7 +5,7 @@ import android.util.Log
 import com.zebra.rfid.api3.*
 import java.util.ArrayList
 
-class RFIDReaderInterface(var listener: IRFIDReaderListener) : RfidEventsListener {
+class RFIDReaderInterface(var context: Context, var listener: IRFIDReaderListener?) : RfidEventsListener {
 
     private val TAG: String = RFIDReaderInterface::class.java.simpleName
 
@@ -20,7 +20,7 @@ class RFIDReaderInterface(var listener: IRFIDReaderListener) : RfidEventsListene
     lateinit var reader: RFIDReader
     var multipleReadType: RFIDReaderMultipleReadType = RFIDReaderMultipleReadType.multiple
 
-    fun connect(context: Context): Boolean {
+    fun connect(): Boolean {
         readers = Readers(context, ENUM_TRANSPORT.ALL)
         try {
             return readers?.let { readers ->
@@ -31,23 +31,23 @@ class RFIDReaderInterface(var listener: IRFIDReaderListener) : RfidEventsListene
                         reader!!.connect()
                         configureReader()
                         Log.d(TAG, "RFID Reader Connected!")
-                        listener.onRFIDReaderConnect(this, reader)
+                        listener?.onRFIDReaderConnect(this, reader)
                         true
                     } else false
                 } ?: false
             } ?: false
         } catch (e: InvalidUsageException) {
             e.printStackTrace()
-            listener.onRFIDReaderError(this, e)
+            listener?.onRFIDReaderError(this, e)
         } catch (e: OperationFailureException) {
             e.printStackTrace()
-            listener.onRFIDReaderError(this, e)
+            listener?.onRFIDReaderError(this, e)
         } catch (e: OperationFailureException) {
             e.printStackTrace()
-            listener.onRFIDReaderError(this, e)
+            listener?.onRFIDReaderError(this, e)
         } catch (e: InvalidUsageException) {
             e.printStackTrace()
-            listener.onRFIDReaderError(this, e)
+            listener?.onRFIDReaderError(this, e)
         }
         Log.d(TAG, "RFID Reader connection error!")
         return false
@@ -68,10 +68,10 @@ class RFIDReaderInterface(var listener: IRFIDReaderListener) : RfidEventsListene
                 reader.Config.setKeylayoutType(ENUM_KEYLAYOUT_TYPE.UPPER_TRIGGER_FOR_SLED_SCAN)
             } catch (e: InvalidUsageException) {
                 e.printStackTrace()
-                listener.onRFIDReaderError(this, e)
+                listener?.onRFIDReaderError(this, e)
             } catch (e: OperationFailureException) {
                 e.printStackTrace()
-                listener.onRFIDReaderError(this, e)
+                listener?.onRFIDReaderError(this, e)
             }
         }
     }
@@ -102,12 +102,12 @@ class RFIDReaderInterface(var listener: IRFIDReaderListener) : RfidEventsListene
         }
     }
     override fun eventStatusNotify(rfidStatusEvents: RfidStatusEvents) {
-        Log.d(TAG, "Status Notification: " + rfidStatusEvents.StatusEventData.statusEventType)
+        Log.d(TAG, "Status Notification: ${rfidStatusEvents.StatusEventData.statusEventType}")
         if (rfidStatusEvents.StatusEventData.statusEventType === STATUS_EVENT_TYPE.HANDHELD_TRIGGER_EVENT) {
             if (rfidStatusEvents.StatusEventData.HandheldTriggerEventData.handheldEvent === HANDHELD_TRIGGER_EVENT_TYPE.HANDHELD_TRIGGER_PRESSED) {
-                listener.onTriggerStateChange(this, RFIDReaderTriggerState.down)
+                listener?.onTriggerStateChange(this, RFIDReaderTriggerState.down)
             } else if (rfidStatusEvents.StatusEventData.HandheldTriggerEventData.handheldEvent === HANDHELD_TRIGGER_EVENT_TYPE.HANDHELD_TRIGGER_RELEASED) {
-                listener.onTriggerStateChange(this, RFIDReaderTriggerState.up)
+                listener?.onTriggerStateChange(this, RFIDReaderTriggerState.up)
             }
         }
     }
@@ -131,7 +131,7 @@ class RFIDReaderInterface(var listener: IRFIDReaderListener) : RfidEventsListene
                     }
                 }
                 if (multipleReadType != RFIDReaderMultipleReadType.single || !isDataExists)
-                    listener.onTagRead(this, tag)
+                    listener?.onTagRead(this, tag)
                 isDataExists = true
                 if (multipleReadType != RFIDReaderMultipleReadType.multiple) {
                     stopRead()
