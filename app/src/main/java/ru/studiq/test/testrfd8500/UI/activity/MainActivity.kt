@@ -5,6 +5,8 @@ import android.content.pm.PackageManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.ArrayAdapter
+import android.widget.Button
+import android.widget.EditText
 import android.widget.ListView
 import android.widget.ProgressBar
 import android.widget.Toast
@@ -19,9 +21,23 @@ class MainActivity : AppCompatActivity(), IZebraHandheldDeviceListener {
     private val BLUETOOTH_PERMISSION_REQUEST_CODE = 100
     private val ACCESS_FINE_LOCATION_REQUEST_CODE = 99
 
+    private var lastTag: RFIDReaderTag? = null
+
+    private val textCode by lazy { findViewById<EditText?>(R.id.mainactivity_text_lastcode) }
+    private val buttonWrite by lazy { findViewById<Button?>(R.id.mainactivity_btn_write) }
     private val listView by lazy { findViewById<ListView?>(R.id.mainactivity_list_data) }
     private val progressBar by lazy { findViewById<ProgressBar?>(R.id.mainactivity_progressbar) }
 
+    private var tag: RFIDReaderTag?
+        get() = lastTag
+        set(value) {
+            lastTag = value
+            value?.asString()?.let { str ->
+                textCode.setText(value?.key)
+                dataList.add(0, "RFID TAG: ${str}")
+                listView.invalidateViews()
+            }
+        }
     private var dataList: MutableList<String> = mutableListOf()
 
     @SuppressLint("MissingInflatedId")
@@ -33,18 +49,38 @@ class MainActivity : AppCompatActivity(), IZebraHandheldDeviceListener {
         listView.adapter = listAdapter
         device = ZebraHandheldDevice(this).apply {
             connect(object : IZebraHandheldDeviceActionListener{
-                override fun onZebraHandheldDeviceActionSuccess(sender: ZebraHandheldDevice?, data: Any?) {
-                    runOnUiThread {
-                        Toast.makeText(this@MainActivity, "Device ${sender?.name ?: "[UNKNOWN]"} successfully connect", Toast.LENGTH_LONG).show()
+                override fun onZebraHandheldDeviceActionSuccess(sender: Any?, data: Any?) {
+                    (sender as? ZebraHandheldDevice)?.let { sender ->
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, "Device ${sender.name ?: "[UNKNOWN]"} successfully connect", Toast.LENGTH_LONG).show()
+                        }
+                        sender.multipleReadType = RFIDReaderMultipleReadType.single
                     }
-                    sender?.multipleReadType = RFIDReaderMultipleReadType.single
                 }
-                override fun onZebraHandheldDeviceActionError(sender: ZebraHandheldDevice?, msg: ZebraHandheldDeviceMessage?) {
+                override fun onZebraHandheldDeviceActionError(sender: Any?, msg: ZebraHandheldDeviceMessage?) {
                     runOnUiThread {
                         Toast.makeText(this@MainActivity, "Device connection error\n${msg?.msg ?: "[UNKNOWN]"}", Toast.LENGTH_LONG).show()
                     }
                 }
             })
+        }
+        buttonWrite.setOnClickListener {
+            tag?.key?.let { key ->
+                device?.rfidInterface?.startWrite(key, RFIDReaderMemoryBank.epc, textCode.text.toString(), "00", 2, object: IZebraHandheldDeviceActionListener {
+                    override fun onZebraHandheldDeviceActionSuccess(sender: Any?, data: Any?) {
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, "Success", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    override fun onZebraHandheldDeviceActionError(sender: Any?, msg: ZebraHandheldDeviceMessage?) {
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, msg?.msg ?: "Error", Toast.LENGTH_SHORT).show()
+                        }
+
+                    }
+                })
+
+            }
         }
     }
 
@@ -72,10 +108,7 @@ class MainActivity : AppCompatActivity(), IZebraHandheldDeviceListener {
 
     override fun onZebraHandheldDeviceTagRead(sender: ZebraHandheldDevice?, tag: RFIDReaderTag?) {
         runOnUiThread {
-            tag?.asString()?.let { str ->
-                dataList.add(0, "RFID TAG: ${str}")
-                listView.invalidateViews()
-            }
+            this.tag = tag
         }
         if (device?.multipleReadType == RFIDReaderMultipleReadType.single)
             device?.triggerType = RFIDReaderTriggerAction.barcode

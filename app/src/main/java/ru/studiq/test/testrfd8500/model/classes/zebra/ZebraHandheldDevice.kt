@@ -9,6 +9,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import ru.studiq.test.testrfd8500.model.classes.zebra.barcode.*
@@ -30,7 +32,7 @@ class ZebraHandheldDevice(var context: Context):
     }
     private val TAG: String = ZebraHandheldDevice::class.java.simpleName
 
-    private var rfidInterface: RFIDReaderInterface? = null
+    public var rfidInterface: RFIDReaderInterface? = null
     private var barcodeInterface: BarcodeScannerInterface? = null
 
     private val BLUETOOTH_PERMISSION_REQUEST_CODE = 100
@@ -179,9 +181,53 @@ class ZebraHandheldDevice(var context: Context):
 
     override fun onTagRead(sender: RFIDReaderInterface?, tag: RFIDReaderTag?) {
         listener?.onZebraHandheldDeviceTagRead(this, tag)
+        return
+        tag?.let { obj ->
+            rfidInterface?.stopRead()
+            var delay = 1000L
+            Handler(Looper.getMainLooper()).postDelayed({
+                val offset = 2
+                val memoryBank = RFIDReaderMemoryBank.epc
+                val oldTid = "E2801160200073AF52E508A5"
+                val oldEPC = "CDCA30003028001E848072ED2A972BAF"
+                var olddata = "CDCA30003028001E848072ED2A972BAF"
+                var newdata = "CDCA30003028001E848072ED2A972BA0"
+                olddata = when (memoryBank) {
+                    RFIDReaderMemoryBank.epc -> olddata.substring(offset * 4, olddata.length)
+                    else -> olddata
+                }
+                newdata = when (memoryBank) {
+                    RFIDReaderMemoryBank.epc -> newdata.substring(offset * 4, newdata.length)
+                    else -> newdata
+                }
+
+//                rfidInterface?.startWrite(obj, RFIDReaderMemoryBank.epc, newdata, 2, object: IZebraHandheldDeviceActionListener {
+                rfidInterface?.startWrite(olddata, RFIDReaderMemoryBank.epc, newdata, "00", 2, object: IZebraHandheldDeviceActionListener {
+
+                        override fun onZebraHandheldDeviceActionSuccess(sender: Any?, data: Any?) {
+                        print("success")
+                    }
+                    override fun onZebraHandheldDeviceActionError(sender: Any?, msg: ZebraHandheldDeviceMessage?) {
+                        val mag = msg?.msg ?: "error"
+                        print(msg)
+
+                    }
+                })
+            }, delay)
+        }
     }
 
     override fun onTriggerStateChange(sender: RFIDReaderInterface?, state: RFIDReaderTriggerState) {
+
+         when (state) {
+
+//           RFIDReaderTriggerState.down -> rfidInterface?.startInventory()
+//           RFIDReaderTriggerState.up -> rfidInterface?.stopInventory()
+             RFIDReaderTriggerState.down -> rfidInterface?.startRead()
+             RFIDReaderTriggerState.up -> rfidInterface?.stopRead()
+            else -> return
+        }
+        return
         if (listener?.onZebraHandheldDeviceTriggerStateChange(this, state) ?: true) {
             when (triggerType) {
                 RFIDReaderTriggerAction.RFID -> {

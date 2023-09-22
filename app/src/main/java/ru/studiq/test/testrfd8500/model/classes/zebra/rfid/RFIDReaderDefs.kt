@@ -17,8 +17,8 @@ enum class  RFIDReaderMultipleReadType(var value: Int) {
     multiple(1)
 }
 
-open class RFIDReaderTag(var epc: String? = "", var tid: String? = "", var usr: String = "") {
+open class RFIDReaderTag(var key: String? = "", var epc: String? = "", var tid: String? = "", var usr: String = "") {
     fun asString(): String {
-        return "EPC ${epc}\nTID ${tid}\nUSER ${usr}\n"
+        return "KEY=${key}:\nEPC ${epc}\nTID ${tid}\nUSER ${usr}\n"
     }
 }
