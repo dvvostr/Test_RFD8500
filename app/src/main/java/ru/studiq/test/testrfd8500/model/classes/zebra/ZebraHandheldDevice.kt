@@ -8,13 +8,24 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import ru.studiq.test.testrfd8500.model.classes.zebra.barcode.*
-import ru.studiq.test.testrfd8500.model.classes.zebra.rfid.*
+import ru.studiq.test.testrfd8500.model.classes.zebra.barcode.BarcodeScannerInterface
+import ru.studiq.test.testrfd8500.model.classes.zebra.barcode.IBarcodeScannedListener
+import ru.studiq.test.testrfd8500.model.classes.zebra.rfid.IRFIDReaderListener
+import ru.studiq.test.testrfd8500.model.classes.zebra.rfid.RFIDReaderInterface
+import ru.studiq.test.testrfd8500.model.classes.zebra.rfid.RFIDReaderMemoryBank
+import ru.studiq.test.testrfd8500.model.classes.zebra.rfid.RFIDReaderMultipleReadType
+import ru.studiq.test.testrfd8500.model.classes.zebra.rfid.RFIDReaderTag
+import ru.studiq.test.testrfd8500.model.classes.zebra.rfid.RFIDReaderTriggerAction
+import ru.studiq.test.testrfd8500.model.classes.zebra.rfid.RFIDReaderTriggerState
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class ZebraHandheldDevice(var context: Context):
     IBarcodeScannedListener,
@@ -32,13 +43,14 @@ class ZebraHandheldDevice(var context: Context):
     }
     private val TAG: String = ZebraHandheldDevice::class.java.simpleName
 
-    public var rfidInterface: RFIDReaderInterface? = null
+    private var rfidInterface: RFIDReaderInterface? = null
     private var barcodeInterface: BarcodeScannerInterface? = null
 
     private val BLUETOOTH_PERMISSION_REQUEST_CODE = 100
     private val ACCESS_FINE_LOCATION_REQUEST_CODE = 99
 
     private var listener: IZebraHandheldDeviceListener? = null
+    private var toneGenerator: ToneGenerator? = null
 
     public var triggerType: RFIDReaderTriggerAction = RFIDReaderTriggerAction.RFID
     public val name : String?
@@ -76,6 +88,7 @@ class ZebraHandheldDevice(var context: Context):
                 listener?.onZebraHandheldDeviceInit(this)
             }
         }
+//        configireBeeper()
     }
     public fun configureDevice(activity: Activity) {
         if (barcodeInterface == null)
@@ -174,6 +187,40 @@ class ZebraHandheldDevice(var context: Context):
         filter.addAction("${context.packageName}.service.ACTION")
         context.registerReceiver(dataWedgeReceiver, filter)
         isDWRegistered = true
+    }
+    private fun configireBeeper() {
+        val streamType = AudioManager.STREAM_DTMF
+        var percantageVolume = 100
+        toneGenerator = try {
+            ToneGenerator(streamType, percantageVolume)
+        } catch (exception: RuntimeException) {
+            null
+        }
+    }
+    fun setAntennaLevel(antennaIndex: Int, level: Double): Boolean {
+        return rfidInterface?.setAntennaLevel(antennaIndex, level) ?: false
+    }
+    private fun beep() {
+        if (toneGenerator != null) {
+            val toneType = ToneGenerator.TONE_PROP_BEEP
+            toneGenerator!!.startTone(toneType)
+        }
+    }
+    fun beep(beepType: Int) {
+        barcodeInterface?.beep(beepType)
+    }
+
+    fun blinkLED(ledType: BarcodeScannerInterface.LEDType, delay: Long = 300): Boolean {
+        return barcodeInterface?.blinkLED(ledType, delay) ?: false
+    }
+    fun setLED(ledType: BarcodeScannerInterface.LEDType): Boolean {
+        return barcodeInterface?.blinkLED(ledType) ?: false
+    }
+    fun tagRead(tagId: String, memoryBank: RFIDReaderMemoryBank, password: String, length: Int, offset: Int, resultListener: IZebraHandheldDeviceActionListener?) {
+        rfidInterface?.startRead(tagId, memoryBank, password, length, offset, resultListener)
+    }
+    fun tagWrite(tagId: String, memoryBank: RFIDReaderMemoryBank, data: String, password: String, offset: Int, resultListener: IZebraHandheldDeviceActionListener?) {
+        rfidInterface?.startWrite(tagId, memoryBank, data, password, offset, resultListener)
     }
     override fun onBarcodeScan(barcode: String?) {
         listener?.onZebraHandheldDeviceBarcodeScan(this, barcode)

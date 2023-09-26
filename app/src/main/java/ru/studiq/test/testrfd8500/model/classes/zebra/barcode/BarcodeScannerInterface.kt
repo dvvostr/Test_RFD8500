@@ -8,6 +8,7 @@ import com.zebra.scannercontrol.*
 import ru.studiq.test.testrfd8500.model.interfaces.ICustomObjectEventListener
 import java.util.ArrayList
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class BarcodeScannerInterface (val context: Context?, var listener: IBarcodeScannedListener?): IDcsSdkApiDelegate {
     private var sdkHandler: SDKHandler? = null
@@ -21,6 +22,17 @@ class BarcodeScannerInterface (val context: Context?, var listener: IBarcodeScan
         greenOn(RMDAttributes.RMD_ATTR_VALUE_ACTION_LED_GREEN_ON),
         otherOn(RMDAttributes.RMD_ATTR_VALUE_ACTION_LED_OTHER_ON),
         otherOff(RMDAttributes.RMD_ATTR_VALUE_ACTION_LED_OTHER_OFF);
+        val negative: LEDType
+            get() {
+                return when (this) {
+                    redOn -> redOff
+                    redOff -> redOn
+                    greenOff -> greenOn
+                    greenOn -> greenOff
+                    otherOn -> otherOff
+                    otherOff -> otherOn
+                }
+            }
     }
 
     fun getAvailableScanners() : ArrayList<DCSScannerInfo> {
@@ -95,6 +107,19 @@ class BarcodeScannerInterface (val context: Context?, var listener: IBarcodeScan
             setLED(LEDType.redOff)
         }
         sdkHandler?.dcssdkStopScanningDevices()
+    }
+    fun beep(beepType: Int): Boolean {
+        val xml = "<inArgs><scannerID>${scannerID}</scannerID><cmdArgs><arg-int>${beepType}</arg-int></cmdArgs></inArgs>"
+        val outXML = StringBuilder()
+        executeCommandAsync(DCSSDKDefs.DCSSDK_COMMAND_OPCODE.DCSSDK_SET_ACTION, xml, outXML)
+        return true
+    }
+    fun blinkLED(ledType: LEDType, delay: Long = 300): Boolean {
+        setLED(ledType)
+        Executors.newSingleThreadScheduledExecutor().schedule({
+            setLED(ledType.negative)
+        }, delay, TimeUnit.MILLISECONDS)
+        return true
     }
     fun setLED(ledType: LEDType): Boolean {
         val xml = "<inArgs><scannerID>${scannerID}</scannerID><cmdArgs><arg-int>${ledType.value}</arg-int></cmdArgs></inArgs>"

@@ -10,4 +10,8 @@ interface IRFIDReaderListener {
     open fun onRFIDReaderSuccess(sender: RFIDReaderInterface?, data: Any?) {}
     open fun onRFIDReaderError(sender: RFIDReaderInterface?, exception: Exception) {}
     open fun onTriggerStateChange(sender: RFIDReaderInterface?, state: RFIDReaderTriggerState) {}
+    open fun onRFIDReaderCharging(sender: Context?, isCharging: Boolean) {}
+    open fun onRFIDReaderBattery(sender: Context?, level: Int, isCharging: Boolean, desc: String?) {}
+    open fun onRFIDCradleChange(sender: Context?, isOnCradle: Boolean, desc: String?) {}
+
 }

@@ -2,7 +2,6 @@ package ru.studiq.test.testrfd8500.UI.activity
 
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -10,6 +9,8 @@ import android.widget.EditText
 import android.widget.ListView
 import android.widget.ProgressBar
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.zebra.scannercontrol.RMDAttributes
 import ru.studiq.test.testrfd8500.R
 import ru.studiq.test.testrfd8500.model.classes.zebra.*
 import ru.studiq.test.testrfd8500.model.classes.zebra.barcode.*
@@ -25,9 +26,10 @@ class MainActivity : AppCompatActivity(), IZebraHandheldDeviceListener {
 
     private val textCode by lazy { findViewById<EditText?>(R.id.mainactivity_text_lastcode) }
     private val buttonWrite by lazy { findViewById<Button?>(R.id.mainactivity_btn_write) }
+    private val buttonTest1 by lazy { findViewById<Button?>(R.id.mainactivity_btn_test1) }
+    private val buttonTest2 by lazy { findViewById<Button?>(R.id.mainactivity_btn_test2) }
     private val listView by lazy { findViewById<ListView?>(R.id.mainactivity_list_data) }
     private val progressBar by lazy { findViewById<ProgressBar?>(R.id.mainactivity_progressbar) }
-
     private var tag: RFIDReaderTag?
         get() = lastTag
         set(value) {
@@ -66,14 +68,18 @@ class MainActivity : AppCompatActivity(), IZebraHandheldDeviceListener {
         }
         buttonWrite.setOnClickListener {
             tag?.key?.let { key ->
-                device?.rfidInterface?.startWrite(key, RFIDReaderMemoryBank.epc, textCode.text.toString(), "00", 2, object: IZebraHandheldDeviceActionListener {
+                device?.tagWrite(key, RFIDReaderMemoryBank.epc, textCode.text.toString(), "00", 2, object: IZebraHandheldDeviceActionListener {
                     override fun onZebraHandheldDeviceActionSuccess(sender: Any?, data: Any?) {
                         runOnUiThread {
+                            device?.beep(RMDAttributes.RMD_ATTR_VALUE_ACTION_HIGH_SHORT_BEEP_1)
+                            device?.blinkLED(BarcodeScannerInterface.LEDType.greenOn)
                             Toast.makeText(this@MainActivity, "Success", Toast.LENGTH_SHORT).show()
                         }
                     }
                     override fun onZebraHandheldDeviceActionError(sender: Any?, msg: ZebraHandheldDeviceMessage?) {
                         runOnUiThread {
+                            device?.beep(RMDAttributes.RMD_ATTR_VALUE_ACTION_HIGH_SHORT_BEEP_3)
+                            device?.blinkLED(BarcodeScannerInterface.LEDType.redOn)
                             Toast.makeText(this@MainActivity, msg?.msg ?: "Error", Toast.LENGTH_SHORT).show()
                         }
 
@@ -81,6 +87,14 @@ class MainActivity : AppCompatActivity(), IZebraHandheldDeviceListener {
                 })
 
             }
+        }
+        buttonTest1.setOnClickListener {
+            device?.setAntennaLevel(1, 10.0)
+        }
+        buttonTest2.setOnClickListener {
+            dataList.removeAll(dataList)
+            listView.invalidateViews()
+//            device?.rfidInterface?.reader?.Config?.beeperVolume = BEEPER_VOLUME.HIGH_BEEP
         }
     }
 
@@ -107,7 +121,11 @@ class MainActivity : AppCompatActivity(), IZebraHandheldDeviceListener {
     }
 
     override fun onZebraHandheldDeviceTagRead(sender: ZebraHandheldDevice?, tag: RFIDReaderTag?) {
+        device?.beep(RMDAttributes.RMD_ATTR_VALUE_ACTION_HIGH_SHORT_BEEP_1)
+        device?.blinkLED(BarcodeScannerInterface.LEDType.redOn)
         runOnUiThread {
+            device?.beep(RMDAttributes.RMD_ATTR_VALUE_ACTION_HIGH_SHORT_BEEP_1)
+            device?.blinkLED(BarcodeScannerInterface.LEDType.greenOn)
             this.tag = tag
         }
         if (device?.multipleReadType == RFIDReaderMultipleReadType.single)
